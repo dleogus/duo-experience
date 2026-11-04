@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+target/
+.DS_Store
+.env*
+!.env.example
+apps/web/public/wasm/
+packages/duo-wasm-pkg/

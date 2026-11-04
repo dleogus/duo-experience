@@ -1,0 +1,55 @@
+@import "tailwindcss";
+:root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#080d16;color:#f7f8fc}
+button{font:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid #91b8ff;outline-offset:3px}
+.layout{max-width:1180px;margin:0 auto;padding:26px 30px 44px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.logo{color:#fff;font-weight:900;letter-spacing:-.8px;text-decoration:none;font-size:18px}
+.logo span{color:#92b5fa;margin-left:4px}
+.tag{font-size:10px;letter-spacing:1.8px;border:1px solid #52627d;border-radius:100px;padding:8px 12px;color:#bdd0ef}
+.intro{padding:66px 0 36px}
+.eyebrow{color:#83a7e7;letter-spacing:2px;font-size:11px;font-weight:800}
+h1{font-size:clamp(34px,5vw,65px);line-height:1.12;margin:15px 0 18px;letter-spacing:-2px}
+h1 em{font-style:normal;color:#95b8fa}
+.intro p,.side-title p{color:#a6b1c7;line-height:1.65}
+.workspace{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:22px}
+.demo,.sidebar{border:1px solid #283448;border-radius:22px;background:#111a2a;padding:26px}
+.demo{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:530px;overflow:hidden}
+.phone{position:relative;border:8px solid #242f42;border-radius:35px;background:#0f1726;padding:5px;box-shadow:0 22px 45px #0008;transition:width .5s ease,height .5s ease;width:225px;height:337px;max-width:100%}
+.phone.open{width:410px}
+.phone-screen{width:100%;height:100%;position:relative;overflow:hidden;border-radius:23px;background:radial-gradient(circle at 50% 10%,#465eae 0%,#1d345f 45%,#0b1b3b 100%);padding:16px}
+.status{display:flex;justify-content:space-between;font-size:10px;font-weight:700}
+.home-screen{padding-top:45px}
+.greeting{font-size:23px;font-weight:700;letter-spacing:-.7px}
+.apps{display:flex;gap:13px;margin-top:30px}
+.app-icon{border:0;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px}
+.app-icon span{display:grid;place-items:center;background:linear-gradient(140deg,#78a4f4,#5370c5);height:48px;width:48px;border-radius:13px;font-size:23px}
+.app-icon small{font-size:10px}
+.active-app{margin-top:40px;background:#fff;color:#1f2937;border-radius:18px;padding:19px;min-height:150px}
+.active-app h2{font-size:20px}
+.active-app p{font-size:12px;line-height:1.6}
+.back{border:0;background:none;color:#3755a2;padding:0}
+.fold-line{position:absolute;left:50%;top:0;height:100%;width:1px;background:linear-gradient(90deg,transparent,#f5fbff55,transparent);opacity:0;transition:opacity .4s}
+.phone.open .fold-line{opacity:.55}
+.home-indicator{position:absolute;bottom:8px;width:70px;height:3px;background:#fff9;border-radius:6px;left:50%;transform:translateX(-50%)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:29px}
+.controls button,.scenario-detail button,.report-btn{border:1px solid #6d92cd;color:#fff;border-radius:10px;padding:11px 15px;background:#355da3;font-weight:700;font-size:13px}
+.controls .secondary{border-color:#3c4a61;background:#1c2a3e}
+.metrics{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;color:#b1c0da;margin-top:22px;font-size:12px}
+.metrics strong{color:#f8fafc}
+.side-title span{font-size:10px;color:#93add8;letter-spacing:2px;font-weight:800}
+.side-title h2{font-size:25px;margin:10px 0}
+.scenario-list{display:grid;gap:9px;margin:23px 0}
+.scenario{background:#19253a;border:1px solid #314059;border-radius:13px;color:#f8fafc;text-align:left;padding:17px}
+.scenario.selected{border-color:#9bb9f5;background:#263c60}
+.scenario-name{display:block;font-weight:700;margin-bottom:8px}
+.scenario small{color:#b3c5e2}
+.hint,.scenario-detail p,.report p{font-size:13px;color:#b7c3d9;line-height:1.65}
+.scenario-detail,.report{background:#1b2b44;border-radius:14px;padding:15px;margin:15px 0}
+.scenario-detail button{margin-top:8px}
+.report-btn{width:100%;margin-top:17px}
+footer{font-size:12px;color:#8997ae;line-height:1.7;margin-top:30px}
+@media(max-width:760px){.layout{padding:19px 15px}.intro{padding:47px 0 22px}.workspace{grid-template-columns:1fr}.demo,.sidebar{padding:18px}.demo{min-height:470px}.phone.open{width:min(100%,380px)}}
+@media(prefers-reduced-motion:reduce){.phone,.fold-line{transition:none}}
