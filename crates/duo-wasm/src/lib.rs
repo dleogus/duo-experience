@@ -2,11 +2,8 @@ use duo_core::{App, Device, Event};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+#[derive(Default)]
 pub struct Simulator { device: Device }
-
-impl Default for Simulator {
-    fn default() -> Self { Self { device: Device::default() } }
-}
 
 #[wasm_bindgen]
 impl Simulator {
