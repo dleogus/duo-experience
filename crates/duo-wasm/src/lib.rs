@@ -14,17 +14,19 @@ impl Simulator {
         let event = match action {
             "fold" => Event::Fold,
             "unfold" => Event::Unfold,
+            "stress" => Event::Stress,
             "home" => Event::Launch(App::Home),
             "messages" => Event::Launch(App::Messages),
             "browser" => Event::Launch(App::Browser),
             "camera" => Event::Launch(App::Camera),
+            "notes" => Event::Launch(App::Notes),
+            "gallery" => Event::Launch(App::Gallery),
             "reset" => Event::Reset,
             _ => return Err(JsValue::from_str("Unknown action")),
         };
         self.device.dispatch(event);
         self.snapshot()
     }
-
     pub fn snapshot(&self) -> Result<JsValue, JsValue> {
         serde_wasm_bindgen::to_value(&self.device)
             .map_err(|error| JsValue::from_str(&error.to_string()))

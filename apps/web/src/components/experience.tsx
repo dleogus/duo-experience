@@ -1,96 +1,143 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createFallbackEngine, loadEngine, type Action, type Engine, type Snapshot } from "@/lib/simulator";
+import { createFallbackEngine, loadEngine, type Action, type AppId, type Engine, type Snapshot } from "@/lib/simulator";
 
-type Mode = "normal" | "letterbox" | "split" | "collision" | "crack";
-type App = "home" | "messages" | "browser" | "camera";
-const modes: { id: Mode; label: string; sub: string; description: string }[] = [
-  { id: "normal", label: "정상 최적화", sub: "Adaptive layout", description: "펼친 화면에 앱이 자연스럽게 적응하는 기준 화면입니다." },
-  { id: "letterbox", label: "화면 비율 미지원", sub: "Letterbox", description: "일반 스마트폰 화면 비율만 유지해 양옆이 비는 가상의 앱 호환성 문제입니다." },
-  { id: "split", label: "반쪽 화면만 사용", sub: "Split mismatch", description: "왼쪽에는 내용이 있지만 오른쪽 패널이 비어 있는 경우를 시각화합니다." },
-  { id: "collision", label: "접힘선 UI 충돌", sub: "Crease collision", description: "버튼과 중요 정보를 가운데 힌지 위에 배치한 잘못된 UI 사례입니다." },
-  { id: "crack", label: "가운데 크랙 발생", sub: "Fictional display damage", description: "중앙 크랙, 녹색 줄, 검은 번짐을 연출합니다. 실제 기기 고장이나 발생 확률을 뜻하지 않습니다." },
+type Scenario = "normal" | "bad-layout" | "crack";
+const icons: { id: AppId; glyph: string; title: string; style: string }[] = [
+  { id: "messages", glyph: "●●", title: "메시지", style: "mint" },
+  { id: "browser", glyph: "◎", title: "Safari", style: "sky" },
+  { id: "gallery", glyph: "✿", title: "사진", style: "white" },
+  { id: "camera", glyph: "◉", title: "카메라", style: "slate" },
+  { id: "notes", glyph: "▤", title: "메모", style: "yellow" },
 ];
-const appNames: Record<App,string> = { home: "홈", messages: "메시지", browser: "브라우저", camera: "카메라" };
+const damageLabels = ["정상", "접힘 자국", "미세 균열", "패널 손상", "심한 화면 손상"];
+const crackPaths = [
+  "M 500 10 L 501 96 494 142 505 179 499 238 503 301 496 367 500 425 493 490 500 560 494 628 502 700 497 790 502 900",
+  "M 503 201 L 469 224 458 259 425 286 411 324 M 499 305 L 537 330 548 363 589 382 M 498 426 L 463 449 448 492 418 503 402 532",
+  "M 498 547 L 535 564 558 598 600 616 621 645 M 500 671 L 465 699 455 735 425 747 M 497 143 L 526 124 553 120",
+  "M 501 324 L 482 347 471 383 439 402 M 500 579 L 471 590 447 616 429 651 M 500 738 L 533 767 544 800 575 825",
+];
 
-function AppContent({ app }: { app: App }) {
-  return <div className="preview-app">
-    <div className="preview-app-heading">
-      <span className="app-emblem">{app === "messages" ? "✉" : app === "camera" ? "◎" : app === "browser" ? "◉" : "◈"}</span>
-      <div><small>DUO OS / PREVIEW</small><strong>{appNames[app]}</strong></div>
-      <span className="app-menu">•••</span>
-    </div>
-    <div className="preview-banner">
-      <small>DISCOVER MORE</small>
-      <strong>{app === "messages" ? "대화, 더 넓게." : app === "camera" ? "순간을 더 크게." : app === "browser" ? "더 넓은 세상." : "Hello, future."}</strong>
-      <span>앱의 화면 적응을 체험하세요.</span>
-    </div>
-    <div className="preview-cards">
-      <div className="preview-card"><span>01</span><strong>Today</strong><i /></div>
-      <div className="preview-card"><span>02</span><strong>Explore</strong><i /></div>
-    </div>
-    <div className="preview-list"><span /><span /><span /></div>
+function DamageOverlay({level}: {level:number}) {
+  return <div className={`damage-overlay damage-level-${level}`} aria-hidden="true">
+    <div className="crease-shadow" />
+    <div className="oled-glow" />
+    <div className="oled-bleed" />
+    <div className="dead-strip" />
+    <svg className="crack-svg" viewBox="0 0 1000 900" preserveAspectRatio="none" aria-hidden="true">
+      <defs><filter id="crack-halo"><feGaussianBlur stdDeviation="2" /></filter></defs>
+      <g className="crack-glow" filter="url(#crack-halo)">{crackPaths.map((d,i)=><path key={i} d={d}/>)}</g>
+      <g className="crack-lines">{crackPaths.map((d,i)=><path key={i} className={`crack-path crack-path-${i}`} d={d}/>)}</g>
+    </svg>
+    <div className="scanlines" />
   </div>;
 }
-function DeviceScreen({ mode, app }: { mode: Mode; app: App }) {
-  if (mode === "letterbox") return <div className="letterbox-layout"><div className="letterbox-app"><AppContent app={app}/></div><span className="unused-area left">UNUSED SPACE</span><span className="unused-area right">UNUSED SPACE</span></div>;
-  if (mode === "split") return <div className="split-layout"><div className="split-filled"><AppContent app={app}/></div><div className="split-empty"><span>⚠</span><strong>NO SECOND PANE</strong><small>확장된 화면을 활용하지 못했습니다.</small></div></div>;
-  if (mode === "collision") return <div className="collision-layout"><div className="collision-title">WELCOME BACK</div><div className="collision-panels"><div /><div /><div /><div /></div><button className="collision-button" tabIndex={-1}>중앙에 걸친 확인 버튼</button><p>접힘선이 버튼과 텍스트를 가립니다.</p></div>;
-  return <AppContent app={app}/>;
+
+function AppContent({app, broken, onHome}: {app:AppId;broken:boolean;onHome:()=>void}) {
+  if (app === "home") return null;
+  return <div className={`opened-app ${broken?"unoptimized":""}`}>
+    <div className="app-toolbar"><button onClick={onHome} aria-label="홈으로 돌아가기">‹ 홈</button><strong>{icons.find(i=>i.id===app)?.title}</strong><span>•••</span></div>
+    {app === "messages" ? <div className="message-list"><h2>메시지</h2><p className="message-item">🟢 친구 <span>오후 9:41</span><small>화면 가운데가… 괜찮아?</small></p><p className="message-item">🔵 DUO LAB <span>어제</span><small>새로운 폼팩터를 체험해 보세요.</small></p></div>
+    : app === "browser" ? <div className="browser-app"><div className="fake-address">🔒 duolab.example</div><h2>큰 화면을 위한 작은 웹</h2><p>화면을 펼쳤는데, 웹사이트는 아직 작은 화면을 기억하고 있습니다.</p><div className="browser-skeleton"/><div className="browser-skeleton second"/></div>
+    : app === "gallery" ? <div className="gallery-app"><h2>최근 항목</h2><div className="photos"><span>🌇</span><span>🌊</span><span>🌸</span><span>🌃</span></div></div>
+    : app === "camera" ? <div className="camera-app"><div className="viewfinder"><span>가상 카메라 화면</span></div><div className="shutter" /></div>
+    : <div className="notes-app"><h2>오늘의 메모</h2><p>✓ 폴더블폰 펼치기</p><p>✓ 큰 화면에서 앱 실행하기</p><p>□ 크랙은 가상의 연출임을 기억하기</p></div>}
+    {broken && <div className="layout-warning">이 화면은 넓은 디스플레이에 최적화되지 않은 앱을 풍자적으로 연출한 것입니다.</div>}
+  </div>;
 }
 
 export default function Experience() {
   const engine = useRef<Engine>(createFallbackEngine());
-  const [snapshot,setSnapshot] = useState<Snapshot>(engine.current.snapshot());
-  const [ready,setReady] = useState(false);
+  const [state,setState] = useState<Snapshot>(engine.current.snapshot());
   const [wasm,setWasm] = useState(false);
-  const [mode,setMode] = useState<Mode>("normal");
-  const [showDamage,setShowDamage] = useState(true);
+  const [ready,setReady] = useState(false);
+  const [scenario,setScenario] = useState<Scenario>("normal");
+  const [showControls,setShowControls] = useState(true);
+  const [showInfo,setShowInfo] = useState(false);
+  const [fullscreen,setFullscreen] = useState(false);
   useEffect(() => {
-    let active = true;
-    loadEngine().then(({engine: next,wasm: enabled}) => {
-      if(!active) return;
-      engine.current = next;
-      setSnapshot(next.snapshot());
-      setWasm(enabled);
-      setReady(true);
+    let live = true;
+    loadEngine().then(({engine:next,wasm:loaded}) => {
+      if(!live)return;
+      engine.current = next;setState(next.snapshot());setWasm(loaded);setReady(true);
     });
-    return () => { active = false; };
+    return () => {live=false;};
   },[]);
-  const act = (action: Action) => {
-    if(!ready) return;
-    setSnapshot(engine.current.dispatch(action));
-    if(action === "reset") { setMode("normal"); setShowDamage(true); }
+  useEffect(()=>{
+    const onChange=()=>setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange",onChange);
+    return ()=>document.removeEventListener("fullscreenchange",onChange);
+  },[]);
+  const send=(action:Action)=>{
+    if(!ready)return;
+    setState(engine.current.dispatch(action));
+    if(action==="reset")setScenario("normal");
   };
-  const open = snapshot.fold === "open";
-  const current = modes.find(item => item.id === mode)!;
-  return <main className="page">
-    <header className="topbar"><a href="/" className="brand"><span className="brand-symbol">D/</span> duo experience</a><span className="top-label">INDEPENDENT CONCEPT DEMO <i/></span></header>
-    <div className="intro"><div className="eyebrow">INTERACTIVE DISPLAY LAB <span> / </span> UNOFFICIAL</div><h1>펼치는 순간,<br/><em>문제가 보인다.</em></h1><p>가운데 크랙과 앱 최적화 실패 화면을 직접 비교해 보는 가상 폴더블폰 시뮬레이터.</p></div>
-    <div className="studio">
-      <section className="preview-section" aria-label="듀오 기기 시뮬레이션">
-        <div className="section-top"><span><b>01</b> DEVICE VISUALIZER</span><span className="live"><i/> {open?"UNFOLDED":"FOLDED"}</span></div>
-        <div className="device-stage">
-          <div className="stage-glow" />
-          <div data-testid="device" aria-label={open?"펼쳐진 가상 기기":"접힌 가상 기기"} className={`duo-device ${open?"unfolded":"folded"}`}>
-            <div className="glass"><div className="screen-status"><span>9:41</span><span>◢ 5G ▰</span></div>
-              <div className="screen-inner">{open?<DeviceScreen mode={mode} app={snapshot.app}/>:<div className="cover-screen"><span>DUO</span><strong>9:41</strong><small>화면을 펼쳐보세요</small></div>}</div>
-              {open && <><div className="crease" aria-hidden="true"/>{mode === "crack" && showDamage && <div data-testid="crack-effect" className="damage" aria-label="중앙 크랙 시각 효과"><svg viewBox="0 0 160 450" preserveAspectRatio="none"><path d="M77 0 L83 49 L72 78 L87 110 L75 148 L86 183 L69 213 L82 240 L73 271 L89 302 L71 326 L80 364 L74 399 L81 450" stroke="#e6faff" strokeWidth="2.8" fill="none"/><path d="M72 78 L30 58 L19 36 M87 110 L122 91 L138 64 M69 213 L23 232 L0 222 M89 302 L141 276 L160 286 M74 399 L24 420" stroke="#efffff" strokeWidth="1.8" fill="none"/><path d="M81 450 L73 355 L84 291 L74 222 L82 146 L78 0" stroke="#51ff91" strokeWidth="3" fill="none" opacity=".95"/></svg><div className="bleed"/></div>}</>}
-              <div className="home-line"/>
-            </div>
+  const nextDamage=()=>{
+    setScenario("crack");
+    send("stress");
+  };
+  const chooseScenario=(value:Scenario)=>{
+    setScenario(value);
+    if(value==="normal")send("reset");
+    if(value==="crack")send("stress");
+    if(value==="bad-layout" && state.app==="home")send("browser");
+  };
+  const toggleFullscreen=async()=>{
+    try{
+      if(document.fullscreenElement)await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    }catch{/* Fullscreen API may be unavailable on mobile Safari. */}
+  };
+  const onHome=()=>send("home");
+  const opened=state.fold==="open";
+  const damage=scenario==="crack"?Math.max(1,state.damage):state.damage;
+  const broken=scenario==="bad-layout";
+
+  return <main className={`immersive ${opened?"device-open":"device-closed"} ${showControls?"ui-visible":"ui-hidden"}`}>
+    <section className="virtual-display" aria-label="비공식 가상 폴더블폰 화면">
+      <div className="wallpaper" aria-hidden="true"><div className="wallpaper-light"/><div className="wallpaper-orb"/></div>
+      <div className="system-status"><span>9:41</span><span className="island" aria-hidden="true"/><span>●●● ▰</span></div>
+      <div className="display-content">
+        {state.app==="home" ? <>
+          <div className="top-widgets">
+            <div className="date-widget"><small>THURSDAY</small><strong>05</strong><span>NOVEMBER · 2026</span></div>
+            <div className="weather-widget"><span>☀</span><strong>21°</strong><small>오늘은 펼치기 좋은 날</small></div>
           </div>
-          <div className="stage-bottom"><span>● {ready ? wasm?"RUST / WEBASSEMBLY":"TS FALLBACK":"ENGINE LOADING"}</span><span>FOLD EVENTS {snapshot.unfold_count.toString().padStart(2,"0")}</span></div>
-        </div>
-        <div className="device-actions"><button disabled={!ready} onClick={()=>act(open?"fold":"unfold")} className="action-primary">{open?"⇥ 접기":"⇤ 펼치기"}</button><button disabled={!ready} onClick={()=>act("home")}>홈 화면</button><button disabled={!ready} onClick={()=>act("reset")}>↻ 초기화</button></div>
-        <div className="app-tabs" role="group" aria-label="앱 변경">{(["home","messages","browser","camera"] as App[]).map(app=><button disabled={!ready} aria-pressed={snapshot.app===app} className={snapshot.app===app?"active":""} onClick={()=>act(app)} key={app}>{appNames[app]}</button>)}</div>
-        {mode==="crack" && <label className="damage-toggle"><input type="checkbox" checked={showDamage} onChange={e=>setShowDamage(e.target.checked)}/> 크랙 효과 표시</label>}
-      </section>
-      <aside className="side-panel"><div className="section-top"><span><b>02</b> ISSUE REPRODUCTION</span><span className="issue-count">05 PRESETS</span></div><div className="panel-intro"><small>CHOOSE A VISUAL MODE</small><h2>어떤 문제가<br/>보이나요?</h2><p>버튼을 선택하면 기기 화면이 해당 상태로 즉시 바뀝니다.</p></div>
-        <div className="modes">{modes.map((m,i)=><button key={m.id} onClick={()=>{setMode(m.id);if(!open&&ready)act("unfold");}} className={mode===m.id?"mode active":"mode"} aria-pressed={mode===m.id}><span className="mode-num">0{i+1}</span><span className="mode-name"><strong>{m.label}</strong><small>{m.sub}</small></span><span className="mode-chevron">↗</span></button>)}</div>
-        <div className="mode-detail" aria-live="polite"><small>CURRENT SCENE / {current.sub.toUpperCase()}</small><h3>{current.label}</h3><p>{current.description}</p></div><div className="safety-note"><strong>CREATIVE SIMULATION</strong><p>이 데모는 특정 제품의 확인된 결함을 주장하지 않습니다. 크랙, 녹색 줄, 앱 호환성 문제는 이해를 돕기 위한 창작 시각 효과입니다.</p></div>
-      </aside>
+          <div className="hero-copy"><small>DUO / EXPERIENCE</small><h1>Think<br/>outside<br/><i>the fold.</i></h1><p>터치하고, 펼치고, 균열을 실험해 보세요.</p></div>
+          <div className="app-grid">{icons.map(icon=><button key={icon.id} className="app-tile" onClick={()=>send(icon.id)}><span className={`app-symbol ${icon.style}`}>{icon.glyph}</span><small>{icon.title}</small></button>)}</div>
+        </> : <AppContent app={state.app} broken={broken} onHome={onHome}/>}
+      </div>
+      <div className="dock"><button onClick={onHome} aria-label="홈 화면">⌂</button><button onClick={()=>send("messages")} aria-label="메시지 열기">●●</button><button onClick={()=>send("browser")} aria-label="브라우저 열기">◎</button><button onClick={()=>send("camera")} aria-label="카메라 열기">◉</button></div>
+      <button className="crease-touch" onClick={nextDamage} aria-label="중앙 접힘 부위를 눌러 가상 균열 효과 증가" title="접힘 부위를 탭해보세요"/>
+      <DamageOverlay level={damage}/>
+      {!opened&&<div className="fold-cover"><span>DUO</span><strong>9:41</strong><small>화면이 접혔습니다</small><button onClick={()=>send("unfold")}>↗ 펼치기</button></div>}
+      <div className="home-bar"/>
+    </section>
+    <div className="control-top">
+      <span className="identity">DUO<span>EXPERIENCE</span><b>CONCEPT / NOT A REAL DEVICE</b></span>
+      <div className="top-actions">
+        <button onClick={()=>setShowInfo(true)} aria-label="체험 안내">ⓘ</button>
+        <button onClick={toggleFullscreen} aria-label={fullscreen?"전체 화면 종료":"전체 화면 시작"}>{fullscreen?"↙":"⛶"}</button>
+        <button onClick={()=>setShowControls(value=>!value)} aria-label="조작 패널 표시 전환">{showControls?"✕":"☰"}</button>
+      </div>
     </div>
-    <footer>DUO EXPERIENCE · INDEPENDENT VISUAL EXPERIMENT <span>Apple 또는 Samsung과 제휴하지 않은 비공식 시뮬레이터입니다.</span></footer>
+    {showControls?<div className="control-panel" aria-label="시뮬레이션 조작 패널">
+      <div className="control-header"><div><span className="lab-label">DISPLAY EXPERIENCE</span><strong>당신의 화면이, 가상 듀오가 됩니다.</strong></div><button onClick={()=>setShowControls(false)} aria-label="조작 패널 숨기기">−</button></div>
+      <div className="scenario-tabs" role="group" aria-label="체험 종류">
+        <button className={scenario==="normal"?"picked":""} onClick={()=>chooseScenario("normal")} disabled={!ready}>기본 화면</button>
+        <button className={scenario==="bad-layout"?"picked":""} onClick={()=>chooseScenario("bad-layout")} disabled={!ready}>앱 최적화 오류</button>
+        <button className={scenario==="crack"?"picked":""} onClick={()=>chooseScenario("crack")} disabled={!ready}>화면 크랙</button>
+      </div>
+      <div className="quick-actions">
+        <button className="action-main" onClick={()=>send(opened?"fold":"unfold")} disabled={!ready}>{opened?"⇤ 접기":"⇥ 펼치기"}</button>
+        <button onClick={nextDamage} disabled={!ready}>⌁ 균열 강화</button>
+        <button onClick={()=>{send("reset");setScenario("normal");}} disabled={!ready}>↺ 초기화</button>
+      </div>
+      <div className="simulation-state"><span>DISPLAY <b>{damageLabels[damage] ?? "손상"}</b></span><span>FOLD <b>{state.unfold_count}</b></span><span>ENGINE <b>{!ready?"LOADING":wasm?"RUST / WASM":"TS FALLBACK"}</b></span></div>
+      <p className="disclaimer">비공식·가상 풍자 체험입니다. 화면 균열, 앱 오류, 손상 진행은 창작된 시각 효과이며 특정 실제 제품의 결함이나 내구성에 관한 주장이 아닙니다.</p>
+    </div>:<button className="reopen-panel" onClick={()=>setShowControls(true)}>☰ 체험 설정</button>}
+    {showInfo&&<div className="modal-backdrop" role="presentation" onClick={()=>setShowInfo(false)}><section className="info-dialog" role="dialog" aria-modal="true" aria-label="체험 안내" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowInfo(false)}>✕</button><span>WELCOME TO DUO EXPERIENCE</span><h2>내 화면을 가상 폴더블폰으로.</h2><p>앱 아이콘을 눌러 실행하고 화면 중앙을 탭하면 크랙이 증가합니다. 아래 패널에서 접고 펼치거나 앱 최적화 오류를 연출할 수 있습니다.</p><p>이 프로젝트는 특정 제조사와 관계없는 독립적 풍자 체험입니다. 모든 파손과 결함은 가상 연출입니다.</p><button className="got-it" onClick={()=>setShowInfo(false)}>체험 시작하기 ↗</button></section></div>}
   </main>;
 }
