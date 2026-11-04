@@ -3,159 +3,94 @@
 import { useEffect, useRef, useState } from "react";
 import { createFallbackEngine, loadEngine, type Action, type Engine, type Snapshot } from "@/lib/simulator";
 
-type ScenarioId = "multitask" | "repair" | "display";
-type Scenario = { id: ScenarioId; title: string; category: string; description: string; button: string; outcome: string };
-const scenarios: Scenario[] = [
-  {
-    id: "multitask", title: "멀티태스킹 실험", category: "인터랙티브 데모",
-    description: "가상의 메모와 브라우저를 동시에 띄워보세요. 좁은 화면과 넓은 화면의 차이를 비교합니다.",
-    button: "분할 화면 실행",
-    outcome: "분할 화면이 켜졌습니다. 기기를 접고 펼치며 화면 구성을 비교하세요.",
-  },
-  {
-    id: "repair", title: "수리 상담 시뮬레이션", category: "창작 풍자",
-    description: "예상치 못한 수리 상담을 가상으로 경험합니다. 견적과 보증 정책은 실제 사실이 아닙니다.",
-    button: "가상 상담 시작",
-    outcome: "상담사: 먼저 기기를 재부팅해 보셨나요? 이 대화는 코미디를 위한 창작입니다.",
-  },
-  {
-    id: "display", title: "디스플레이 테스트", category: "가상 사고 실험",
-    description: "선택적으로 화면에 시각 효과를 적용합니다. 고장 빈도나 실제 기기 내구성을 뜻하지 않습니다.",
-    button: "가상 화면 이상 재현",
-    outcome: "시각 효과가 적용됐습니다. 실제 제품의 고장 가능성을 보여주는 것이 아닙니다.",
-  },
+type Mode = "normal" | "letterbox" | "split" | "collision" | "crack";
+type App = "home" | "messages" | "browser" | "camera";
+const modes: { id: Mode; label: string; sub: string; description: string }[] = [
+  { id: "normal", label: "정상 최적화", sub: "Adaptive layout", description: "펼친 화면에 앱이 자연스럽게 적응하는 기준 화면입니다." },
+  { id: "letterbox", label: "화면 비율 미지원", sub: "Letterbox", description: "일반 스마트폰 화면 비율만 유지해 양옆이 비는 가상의 앱 호환성 문제입니다." },
+  { id: "split", label: "반쪽 화면만 사용", sub: "Split mismatch", description: "왼쪽에는 내용이 있지만 오른쪽 패널이 비어 있는 경우를 시각화합니다." },
+  { id: "collision", label: "접힘선 UI 충돌", sub: "Crease collision", description: "버튼과 중요 정보를 가운데 힌지 위에 배치한 잘못된 UI 사례입니다." },
+  { id: "crack", label: "가운데 크랙 발생", sub: "Fictional display damage", description: "중앙 크랙, 녹색 줄, 검은 번짐을 연출합니다. 실제 기기 고장이나 발생 확률을 뜻하지 않습니다." },
 ];
-const appNames = { home: "홈", messages: "메시지", browser: "브라우저", camera: "카메라" } as const;
+const appNames: Record<App,string> = { home: "홈", messages: "메시지", browser: "브라우저", camera: "카메라" };
+
+function AppContent({ app }: { app: App }) {
+  return <div className="preview-app">
+    <div className="preview-app-heading">
+      <span className="app-emblem">{app === "messages" ? "✉" : app === "camera" ? "◎" : app === "browser" ? "◉" : "◈"}</span>
+      <div><small>DUO OS / PREVIEW</small><strong>{appNames[app]}</strong></div>
+      <span className="app-menu">•••</span>
+    </div>
+    <div className="preview-banner">
+      <small>DISCOVER MORE</small>
+      <strong>{app === "messages" ? "대화, 더 넓게." : app === "camera" ? "순간을 더 크게." : app === "browser" ? "더 넓은 세상." : "Hello, future."}</strong>
+      <span>앱의 화면 적응을 체험하세요.</span>
+    </div>
+    <div className="preview-cards">
+      <div className="preview-card"><span>01</span><strong>Today</strong><i /></div>
+      <div className="preview-card"><span>02</span><strong>Explore</strong><i /></div>
+    </div>
+    <div className="preview-list"><span /><span /><span /></div>
+  </div>;
+}
+function DeviceScreen({ mode, app }: { mode: Mode; app: App }) {
+  if (mode === "letterbox") return <div className="letterbox-layout"><div className="letterbox-app"><AppContent app={app}/></div><span className="unused-area left">UNUSED SPACE</span><span className="unused-area right">UNUSED SPACE</span></div>;
+  if (mode === "split") return <div className="split-layout"><div className="split-filled"><AppContent app={app}/></div><div className="split-empty"><span>⚠</span><strong>NO SECOND PANE</strong><small>확장된 화면을 활용하지 못했습니다.</small></div></div>;
+  if (mode === "collision") return <div className="collision-layout"><div className="collision-title">WELCOME BACK</div><div className="collision-panels"><div /><div /><div /><div /></div><button className="collision-button" tabIndex={-1}>중앙에 걸친 확인 버튼</button><p>접힘선이 버튼과 텍스트를 가립니다.</p></div>;
+  return <AppContent app={app}/>;
+}
 
 export default function Experience() {
   const engine = useRef<Engine>(createFallbackEngine());
-  const [snapshot, setSnapshot] = useState<Snapshot>(engine.current.snapshot());
-  const [wasm, setWasm] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [selected, setSelected] = useState<ScenarioId>("multitask");
-  const [active, setActive] = useState<ScenarioId | null>(null);
-  const [completed, setCompleted] = useState<ScenarioId[]>([]);
-  const [report, setReport] = useState(false);
-
+  const [snapshot,setSnapshot] = useState<Snapshot>(engine.current.snapshot());
+  const [ready,setReady] = useState(false);
+  const [wasm,setWasm] = useState(false);
+  const [mode,setMode] = useState<Mode>("normal");
+  const [showDamage,setShowDamage] = useState(true);
   useEffect(() => {
-    let alive = true;
-    loadEngine().then(({ engine: next, wasm: wasmLoaded }) => {
-      if (!alive) return;
+    let active = true;
+    loadEngine().then(({engine: next,wasm: enabled}) => {
+      if(!active) return;
       engine.current = next;
       setSnapshot(next.snapshot());
-      setWasm(wasmLoaded);
+      setWasm(enabled);
       setReady(true);
     });
-    return () => { alive = false; };
-  }, []);
-
-  const dispatch = (action: Action) => {
-    if (!ready) return;
+    return () => { active = false; };
+  },[]);
+  const act = (action: Action) => {
+    if(!ready) return;
     setSnapshot(engine.current.dispatch(action));
-    if (action === "reset") {
-      setSelected("multitask");
-      setCompleted([]);
-      setActive(null);
-      setReport(false);
-    }
+    if(action === "reset") { setMode("normal"); setShowDamage(true); }
   };
-  const runScenario = () => {
-    setActive(selected);
-    setReport(false);
-    if (!completed.includes(selected)) setCompleted(items => [...items, selected]);
-    if (selected === "multitask" && snapshot.fold === "closed") dispatch("unfold");
-  };
-  const chosen = scenarios.find(item => item.id === selected)!;
-  const activeScenario = scenarios.find(item => item.id === active);
-  const isOpen = snapshot.fold === "open";
-
-  return (
-    <main className="layout">
-      <header className="header">
-        <a className="logo" href="/" aria-label="Duo Experience 홈">duo<span>experience</span><span className="logo-dot">.</span></a>
-        <span className="tag">INDEPENDENT · SATIRE PROJECT</span>
-      </header>
-      <section className="intro">
-        <span className="eyebrow"><span className="eyebrow-dot" /> THE INTERACTIVE CONCEPT LAB</span>
-        <h1>기대했던 미래,<br /><em>직접 만져보세요.</em></h1>
-        <p>가상의 폴더블폰을 펼치고, 앱을 실행하고, 어쩌면 조금 당황스러운 상황도 경험해 보세요.</p>
-      </section>
-      <div className="workspace">
-        <section className="demo" aria-label="가상 스마트폰 체험">
-          <div className="demo-head"><span className="live-dot" /> LIVE DEVICE PREVIEW <span className="demo-state">{isOpen ? "UNFOLDED" : "FOLDED"}</span></div>
-          <div className="stage">
-            <div className={isOpen ? "phone open" : "phone closed"} aria-label={isOpen ? "펼쳐진 가상 기기" : "접힌 가상 기기"}>
-              <div className="phone-screen">
-                <div className="status"><span>9:41</span><span>● ▰ ▰</span></div>
-                {active === "multitask" ? (
-                  <div className="split-pane">
-                    <div><strong>메모</strong><p>오늘 할 일</p><span>□ 경험하기</span><span>□ 비교하기</span><span>□ 공유하기</span></div>
-                    <div><strong>브라우저</strong><p>DUO LAB</p><span>새로운 화면을 탐색 중입니다.</span></div>
-                  </div>
-                ) : (
-                  <>
-                    {snapshot.app === "home" ? (
-                      <div className="home-screen">
-                        <div className="device-date">WEDNESDAY, NOV 4</div>
-                        <div className="greeting">Hello,<br />tomorrow.</div>
-                        <div className="apps">
-                          {(["messages", "browser", "camera"] as const).map(app => (
-                            <button key={app} className="app-icon" onClick={() => { setActive(null); dispatch(app); }} aria-label={appNames[app] + " 앱 실행"}>
-                              <span aria-hidden="true">{app === "messages" ? "✉" : app === "browser" ? "◎" : "◉"}</span>
-                              <small>{appNames[app]}</small>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="active-app">
-                        <button className="back" onClick={() => dispatch("home")}>‹ 홈으로</button>
-                        <h2>{appNames[snapshot.app]}</h2>
-                        <p>{snapshot.app === "messages" ? "새로운 메시지가 없습니다." : snapshot.app === "browser" ? "새로운 웹 경험을 탐색해 보세요." : "실제 카메라를 사용하지 않는 가상 화면입니다."}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-                {active === "display" && <div className="display-effect" aria-label="가상 디스플레이 이상 효과"><span /></div>}
-                {active === "repair" && <div className="repair-overlay"><span>SUPPORT CHAT · PARODY</span><p>먼저 기기를 재부팅해 보셨나요?</p><small>실제 상담 또는 수리 안내가 아닙니다.</small></div>}
-                <div className="fold-line" aria-hidden="true" />
-                <div className="home-indicator" />
-              </div>
+  const open = snapshot.fold === "open";
+  const current = modes.find(item => item.id === mode)!;
+  return <main className="page">
+    <header className="topbar"><a href="/" className="brand"><span className="brand-symbol">D/</span> duo experience</a><span className="top-label">INDEPENDENT CONCEPT DEMO <i/></span></header>
+    <div className="intro"><div className="eyebrow">INTERACTIVE DISPLAY LAB <span> / </span> UNOFFICIAL</div><h1>펼치는 순간,<br/><em>문제가 보인다.</em></h1><p>가운데 크랙과 앱 최적화 실패 화면을 직접 비교해 보는 가상 폴더블폰 시뮬레이터.</p></div>
+    <div className="studio">
+      <section className="preview-section" aria-label="듀오 기기 시뮬레이션">
+        <div className="section-top"><span><b>01</b> DEVICE VISUALIZER</span><span className="live"><i/> {open?"UNFOLDED":"FOLDED"}</span></div>
+        <div className="device-stage">
+          <div className="stage-glow" />
+          <div data-testid="device" aria-label={open?"펼쳐진 가상 기기":"접힌 가상 기기"} className={`duo-device ${open?"unfolded":"folded"}`}>
+            <div className="glass"><div className="screen-status"><span>9:41</span><span>◢ 5G ▰</span></div>
+              <div className="screen-inner">{open?<DeviceScreen mode={mode} app={snapshot.app}/>:<div className="cover-screen"><span>DUO</span><strong>9:41</strong><small>화면을 펼쳐보세요</small></div>}</div>
+              {open && <><div className="crease" aria-hidden="true"/>{mode === "crack" && showDamage && <div data-testid="crack-effect" className="damage" aria-label="중앙 크랙 시각 효과"><svg viewBox="0 0 160 450" preserveAspectRatio="none"><path d="M77 0 L83 49 L72 78 L87 110 L75 148 L86 183 L69 213 L82 240 L73 271 L89 302 L71 326 L80 364 L74 399 L81 450" stroke="#e6faff" strokeWidth="2.8" fill="none"/><path d="M72 78 L30 58 L19 36 M87 110 L122 91 L138 64 M69 213 L23 232 L0 222 M89 302 L141 276 L160 286 M74 399 L24 420" stroke="#efffff" strokeWidth="1.8" fill="none"/><path d="M81 450 L73 355 L84 291 L74 222 L82 146 L78 0" stroke="#51ff91" strokeWidth="3" fill="none" opacity=".95"/></svg><div className="bleed"/></div>}</>}
+              <div className="home-line"/>
             </div>
           </div>
-          <div className="controls" aria-label="기기 조작">
-            <button disabled={!ready} onClick={() => dispatch(isOpen ? "fold" : "unfold")}>{isOpen ? "→ 접기" : "↔ 펼치기"}</button>
-            <button disabled={!ready} onClick={() => { setActive(null); dispatch("home"); }} className="secondary">홈 화면</button>
-            <button disabled={!ready} onClick={() => dispatch("reset")} className="secondary">초기화</button>
-          </div>
-          <div className="metrics" role="status" aria-live="polite">
-            <span><i className={wasm ? "engine-dot on" : "engine-dot"} /> {!ready ? "엔진 로딩 중" : wasm ? "Rust / WASM 엔진" : "TypeScript 폴백"}</span>
-            <span>펼치기 <strong>{snapshot.unfold_count}회</strong></span>
-            <span>조작 <strong>{snapshot.actions}회</strong></span>
-          </div>
-        </section>
-        <aside className="sidebar">
-          <div className="side-title"><span>01 / EXPERIENCE LAB</span><h2>어떤 상황을<br />체험할까요?</h2><p>모든 시나리오는 비공식 가상 체험입니다.</p></div>
-          <div className="scenario-list">
-            {scenarios.map((item, index) => (
-              <button key={item.id} aria-pressed={selected === item.id} className={"scenario " + (selected === item.id ? "selected" : "")} onClick={() => setSelected(item.id)}>
-                <span className="scenario-index">0{index + 1}</span>
-                <span className="scenario-info"><strong>{item.title}{completed.includes(item.id) ? " ✓" : ""}</strong><small>{item.category}</small></span>
-                <span aria-hidden="true" className="scenario-arrow">↗</span>
-              </button>
-            ))}
-          </div>
-          <div className="scenario-detail" aria-live="polite">
-            <strong>{chosen.title}</strong>
-            <p>{chosen.description}</p>
-            <button disabled={!ready} onClick={runScenario}>{chosen.button} <span aria-hidden="true">↗</span></button>
-          </div>
-          {activeScenario && <p className="outcome" role="status">{activeScenario.outcome} <button onClick={() => setActive(null)}>효과 닫기</button></p>}
-          <button className="report-btn" onClick={() => setReport(value => !value)}>{report ? "체험 보고서 닫기" : "내 체험 보고서 확인"} <span aria-hidden="true">↗</span></button>
-          {report && <div className="report" role="region" aria-label="체험 보고서"><h3>MY EXPERIENCE</h3><p>완료한 시나리오 <strong>{completed.length} / {scenarios.length}</strong></p><p>기기 조작 {snapshot.actions}회 · 펼치기 {snapshot.unfold_count}회</p><p>이 결과는 실제 제품 성능을 나타내지 않는 가상 체험 기록입니다.</p></div>}
-        </aside>
-      </div>
-      <footer><span>DUO EXPERIENCE © 2026</span><span>비공식 풍자·교육용 프로젝트입니다. Apple 또는 Samsung과 제휴하지 않았으며, 실제 기기·결함·가격·보증 정책을 재현하지 않습니다.</span></footer>
-    </main>
-  );
+          <div className="stage-bottom"><span>● {ready ? wasm?"RUST / WEBASSEMBLY":"TS FALLBACK":"ENGINE LOADING"}</span><span>FOLD EVENTS {snapshot.unfold_count.toString().padStart(2,"0")}</span></div>
+        </div>
+        <div className="device-actions"><button disabled={!ready} onClick={()=>act(open?"fold":"unfold")} className="action-primary">{open?"⇥ 접기":"⇤ 펼치기"}</button><button disabled={!ready} onClick={()=>act("home")}>홈 화면</button><button disabled={!ready} onClick={()=>act("reset")}>↻ 초기화</button></div>
+        <div className="app-tabs" role="group" aria-label="앱 변경">{(["home","messages","browser","camera"] as App[]).map(app=><button disabled={!ready} aria-pressed={snapshot.app===app} className={snapshot.app===app?"active":""} onClick={()=>act(app)} key={app}>{appNames[app]}</button>)}</div>
+        {mode==="crack" && <label className="damage-toggle"><input type="checkbox" checked={showDamage} onChange={e=>setShowDamage(e.target.checked)}/> 크랙 효과 표시</label>}
+      </section>
+      <aside className="side-panel"><div className="section-top"><span><b>02</b> ISSUE REPRODUCTION</span><span className="issue-count">05 PRESETS</span></div><div className="panel-intro"><small>CHOOSE A VISUAL MODE</small><h2>어떤 문제가<br/>보이나요?</h2><p>버튼을 선택하면 기기 화면이 해당 상태로 즉시 바뀝니다.</p></div>
+        <div className="modes">{modes.map((m,i)=><button key={m.id} onClick={()=>{setMode(m.id);if(!open&&ready)act("unfold");}} className={mode===m.id?"mode active":"mode"} aria-pressed={mode===m.id}><span className="mode-num">0{i+1}</span><span className="mode-name"><strong>{m.label}</strong><small>{m.sub}</small></span><span className="mode-chevron">↗</span></button>)}</div>
+        <div className="mode-detail" aria-live="polite"><small>CURRENT SCENE / {current.sub.toUpperCase()}</small><h3>{current.label}</h3><p>{current.description}</p></div><div className="safety-note"><strong>CREATIVE SIMULATION</strong><p>이 데모는 특정 제품의 확인된 결함을 주장하지 않습니다. 크랙, 녹색 줄, 앱 호환성 문제는 이해를 돕기 위한 창작 시각 효과입니다.</p></div>
+      </aside>
+    </div>
+    <footer>DUO EXPERIENCE · INDEPENDENT VISUAL EXPERIMENT <span>Apple 또는 Samsung과 제휴하지 않은 비공식 시뮬레이터입니다.</span></footer>
+  </main>;
 }
