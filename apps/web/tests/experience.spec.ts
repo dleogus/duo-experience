@@ -7,7 +7,8 @@ test("duo visual presets, crack overlay, fold, and Rust/WASM", async ({ page }) 
   await expect(page.getByTestId("device")).toHaveClass(/unfolded/);
   await page.screenshot({ path: "test-results/" + test.info().project.name + "-duo-default.png", fullPage: true });
   await page.getByRole("button", { name: /화면 비율 미지원/ }).click();
-  await expect(page.getByText("UNUSED SPACE").first()).toBeVisible();
+  await expect(page.locator(".letterbox-layout")).toBeVisible();
+  await expect(page.locator(".letterbox-app")).toBeVisible();
   await page.getByRole("button", { name: /반쪽 화면만 사용/ }).click();
   await expect(page.getByText("NO SECOND PANE")).toBeVisible();
   await page.getByRole("button", { name: /접힘선 UI 충돌/ }).click();
