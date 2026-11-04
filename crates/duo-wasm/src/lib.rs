@@ -4,10 +4,14 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct Simulator { device: Device }
 
+impl Default for Simulator {
+    fn default() -> Self { Self { device: Device::default() } }
+}
+
 #[wasm_bindgen]
 impl Simulator {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self { Self { device: Device::default() } }
+    pub fn new() -> Self { Self::default() }
 
     pub fn dispatch(&mut self, action: &str) -> Result<JsValue, JsValue> {
         let event = match action {
