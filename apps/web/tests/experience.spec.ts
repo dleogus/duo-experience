@@ -5,6 +5,7 @@ test("fold, experience scenarios, report and reset", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /기대했던 미래/ })).toBeVisible();
   await expect(page.getByText("Rust / WASM 엔진")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByLabel("접힌 가상 기기")).toBeVisible();
+  await page.screenshot({ path: "test-results/" + test.info().project.name + "-home.png", fullPage: true });
 
   await page.getByRole("button", { name: "↔ 펼치기" }).click();
   await expect(page.getByLabel("펼쳐진 가상 기기")).toBeVisible();
