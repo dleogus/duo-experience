@@ -1,37 +1,40 @@
 # Duo Experience
 
-비공식 풍자형 폴더블폰 웹 시뮬레이터. 실제 Apple/Samsung 제품 또는 공식 서비스가 아닙니다.
+**Your screen is the device.** An independent fullscreen foldable-phone parody built with Next.js, Rust, and WebAssembly.
 
-## Tech
-- Next.js + TypeScript: UI
-- Rust (`duo-core`): 기기 상태 머신
-- wasm-bindgen (`duo-wasm`): 브라우저 연동
-- Static export: 서버 없이 배포 가능
+## Experience
+
+- The browser viewport becomes a fictitious foldable operating-system home screen (no nested phone mockup).
+- Open mock apps: messages, browser, photos, camera, notes.
+- **App optimization** mode deliberately renders a narrow, poorly scaled mock app.
+- **Screen crack** mode progressively draws a center crease, spider cracks, OLED bleed and dead pixel strip using CSS and inline SVG.
+- Tap the center of the screen to deepen the fictional damage. Fold and unfold to advance the simulation.
+- Use fullscreen and hide controls for an immersive mobile-screen experience.
+- Rust `duo-core` state machine drives the fold and damage state; TypeScript fallback enables preview without WASM.
+
+**All screen defects and app compatibility problems are fictional UI effects** and do not report actual defects of any real Apple, Samsung, or other product. This project is independent and unaffiliated.
 
 ## Local development
-Requirements: Node.js 22+, pnpm 10+, Rust stable, `wasm32-unknown-unknown`, `wasm-pack`.
 
-```bash
+Requires Node 22+, pnpm 10+, Rust and wasm-pack.
+
+```sh
 corepack enable
 pnpm install
 rustup target add wasm32-unknown-unknown
 cargo install wasm-pack --locked
-pnpm build:wasm
+pnpm wasm:build
 pnpm dev
 ```
-Visit http://localhost:3000.
 
-## Tests and build
-```bash
+When the engine badge shows **RUST / WASM**, the compiled Rust state machine is active. Without a WASM build it clearly shows **TS FALLBACK**.
+
+## Validation
+
+```sh
 cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-pnpm check
+pnpm --dir apps/web typecheck
 pnpm build
 ```
 
-Static output: `apps/web/out/`. Upload this directory to static hosting.
-
-## Notes
-- In development without a compiled WASM module, the browser UI falls back to TypeScript. The engine indicator shows which engine is active.
-- Fold count and issue scenarios are fictional interactive examples, **not** hardware reliability estimates.
-- This MVP does not contain verified claims about unreleased/rumored devices. Research-backed claims should include dated sources before release.
+Build order matters: generate WASM before the static export. Publish `apps/web/out` to Cloudflare Pages/Workers Static Assets or another static host. See `docs/deployment.md`.

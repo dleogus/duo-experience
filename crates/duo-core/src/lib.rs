@@ -6,10 +6,10 @@ pub enum FoldState { Closed, Open }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum App { Home, Messages, Browser, Camera }
+pub enum App { Home, Messages, Browser, Camera, Notes, Gallery }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Event { Fold, Unfold, Launch(App), Reset }
+pub enum Event { Fold, Unfold, Stress, Launch(App), Reset }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Device {
@@ -17,14 +17,14 @@ pub struct Device {
     pub app: App,
     pub unfold_count: u32,
     pub actions: u32,
+    pub damage: u8,
 }
 
 impl Default for Device {
     fn default() -> Self {
-        Self { fold: FoldState::Closed, app: App::Home, unfold_count: 0, actions: 0 }
+        Self { fold: FoldState::Open, app: App::Home, unfold_count: 0, actions: 0, damage: 0 }
     }
 }
-
 impl Device {
     pub fn dispatch(&mut self, event: Event) {
         if event == Event::Reset { *self = Self::default(); return; }
@@ -34,9 +34,11 @@ impl Device {
             Event::Unfold => {
                 if self.fold == FoldState::Closed {
                     self.unfold_count = self.unfold_count.saturating_add(1);
+                    self.damage = self.damage.saturating_add(1).min(4);
                 }
                 self.fold = FoldState::Open;
             }
+            Event::Stress => self.damage = self.damage.saturating_add(1).min(4),
             Event::Launch(app) => self.app = app,
             Event::Reset => unreachable!(),
         }
@@ -46,25 +48,32 @@ impl Device {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn initial_state() {
-        let device = Device::default();
-        assert_eq!(device.fold, FoldState::Closed);
-        assert_eq!(device.actions, 0);
+    #[test] fn initial_state_is_unfolded_and_pristine() {
+        let d = Device::default();
+        assert_eq!(d.fold, FoldState::Open);
+        assert_eq!(d.damage, 0);
     }
-    #[test] fn repeated_unfold_only_counts_transitions() {
-        let mut device = Device::default();
-        device.dispatch(Event::Unfold);
-        device.dispatch(Event::Unfold);
-        assert_eq!(device.unfold_count, 1);
-        device.dispatch(Event::Fold);
-        device.dispatch(Event::Unfold);
-        assert_eq!(device.unfold_count, 2);
+    #[test] fn damage_increases_only_after_reopening() {
+        let mut d = Device::default();
+        d.dispatch(Event::Unfold);
+        assert_eq!(d.damage, 0);
+        d.dispatch(Event::Fold);
+        d.dispatch(Event::Unfold);
+        assert_eq!(d.damage, 1);
+        d.dispatch(Event::Unfold);
+        assert_eq!(d.damage, 1);
     }
-    #[test] fn reset_restores_initial_snapshot() {
-        let mut device = Device::default();
-        device.dispatch(Event::Launch(App::Camera));
-        device.dispatch(Event::Unfold);
-        device.dispatch(Event::Reset);
-        assert_eq!(device, Device::default());
+    #[test] fn stress_is_bounded_and_reset_restores() {
+        let mut d = Device::default();
+        for _ in 0..10 { d.dispatch(Event::Stress); }
+        assert_eq!(d.damage, 4);
+        d.dispatch(Event::Reset);
+        assert_eq!(d, Device::default());
+    }
+    #[test] fn app_launch_survives_fold() {
+        let mut d = Device::default();
+        d.dispatch(Event::Launch(App::Gallery));
+        d.dispatch(Event::Fold);
+        assert_eq!(d.app, App::Gallery);
     }
 }
