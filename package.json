@@ -1,0 +1,1 @@
+{"name":"duo-experience","private":true,"packageManager":"pnpm@10.0.0","scripts":{"dev":"pnpm --dir apps/web dev","build:wasm":"bash scripts/build-wasm.sh","build":"pnpm build:wasm && pnpm --dir apps/web build","check":"cargo test --workspace && pnpm --dir apps/web exec tsc --noEmit"}}
