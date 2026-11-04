@@ -34,7 +34,8 @@ export function createFallbackEngine(): Engine {
 export async function loadEngine(): Promise<{ engine: Engine; wasm: boolean }> {
   try {
     // wasm-pack's --target web output is an ES module served from /public/wasm.
-    const glue = await import(/* webpackIgnore: true */ "/wasm/duo_wasm.js");
+    const moduleUrl = "/wasm/duo_wasm.js";
+    const glue = await import(/* webpackIgnore: true */ moduleUrl);
     await glue.default("/wasm/duo_wasm_bg.wasm");
     const simulator = new glue.Simulator();
     return {
